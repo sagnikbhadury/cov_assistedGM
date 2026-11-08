@@ -9,7 +9,7 @@ fit_mSSL(X, Y, ...)
 \arguments{
 \item{X, Y}{Covariate and response matrices.}
 
-\item{...}{Passed to \code{mSSL::mSSL_dpe}.}
+\item{...}{Passed to \code{mSSL_dpe}.}
 }
 \value{
 A list with the \code{mSSL_dpe} fit, \code{Omega} (estimated precision),
@@ -18,7 +18,8 @@ A list with the \code{mSSL_dpe} fit, \code{Omega} (estimated precision),
 \description{
 The "mSSL" competitor of Examples 2 and 3 (Deshpande, Rockova and George, 2019) lives in
 the GitHub package \code{skdeshpande91/multivariate_SSL/mSSL}, which is not on CRAN and is
-therefore not vendored here. This wrapper calls \code{mSSL::mSSL_dpe(X, Y)} exactly as the
+therefore not vendored here and not declared as a dependency (\code{\link{has_mSSL}} tests for
+it at run time). This wrapper calls \code{mSSL_dpe(X, Y)} of that package exactly as the
 authors' scripts do and returns the absolute partial correlations and the implied graph,
 which is what the paper's Figures 6B and 9B display. Install the package with
 \code{remotes::install_github("skdeshpande91/multivariate_SSL", subdir = "mSSL")}.
