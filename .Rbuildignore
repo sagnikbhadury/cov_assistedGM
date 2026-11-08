@@ -1,0 +1,8 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^README\.Rmd$
+^\.github$
+^LICENSE\.md$
+^reproduce$
+^cran-comments\.md$
+^\.gitignore$

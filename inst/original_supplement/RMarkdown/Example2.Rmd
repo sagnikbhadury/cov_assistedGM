@@ -1,0 +1,176 @@
+---
+title: "**Instruction For Reproducing Section 4.2 Under PxG**"
+subtitle: 'Covariate-Assisted Bayesian Graph Learning for Heterogeneous Data'
+output: pdf_document
+---
+
+**Description:** This R Markdown file provides the workflow for reproducing simulation results in \S 4.2 under the PxG model.
+
+
+
+## 1. Generating Simulation Data
+```{r, echo = TRUE, message = FALSE, results = "hide"}
+rm(list = ls())
+
+## reading functions for the simulation study
+## "PxG-GW.R" contains all functions for Gaussian-G-Wishart model (section 3.2.1)
+source("PxG-GW.R")
+
+## generating simulation data from the 5-dimensional GGM in section 4.2
+## first, generating covariate x
+set.seed(2020)
+x = runif(300, -0.8, 0.8)
+
+## true precision matrix as a linear function of x
+Omega = function(x){
+  G0 = diag(5) - diag(5)
+  G0[1,2] = G0[2,3] = G0[3,4] = G0[4,5] = 1
+  G0 = G0 + t(G0)
+
+  Omega = x*G0
+  diag(Omega) = 1.4
+  return(Omega)
+}
+
+## true graph
+G0 = diag(5) - diag(5)
+G0[1,2] = G0[2,3] = G0[3,4] = G0[4,5] = 1
+G0 = G0 + t(G0)
+diag(G0) = 1
+
+## generating response y according to the true precision matrix
+y = matrix(0, 300, 5)
+for(i in 1:300){
+  temp = solve(Omega(x[i]))
+  y[i,] = t(t(chol(temp))%*%rnorm(5,0,1)) 
+}
+X = matrix(x, 300, 1); Y = y
+```
+
+
+
+## 2. Fitting Simulation Data With PxG
+```{r, echo = TRUE, message = FALSE, results = "hide", eval = TRUE}
+## fitting simulation data with the proposed PxG model
+set.seed(2020)
+A = PxG_GW(Y = Y, X = X, b = 3, D = diag(5), alphaG = 0.2,
+          mu0 = as.vector(rep(0,1)), sigsq0 = 1, b1 = 10, b2 = 0.1, M = 1, N = 15, 
+          burnin = 1000, nmcmc = 2000, z0 = sample(1:15, 300, TRUE, rep(1/15, 15)), B = 3)
+```
+
+
+
+## 3. Preparation For Plots
+```{r, echo = TRUE, message = FALSE, results = "hide"}
+## generating true partial correlation sequences for plot purposes
+xseq = seq(-0.8, 0.8, by = 0.01)
+Gseq = Oseq = array(0, c(5,5,length(xseq)))
+for(i in 1:length(xseq)){
+  Oseq[,,i] = Omega(xseq[i])
+}
+
+## true partial correlation sequences
+w12 = Oseq[1,2,]/1.4
+w23 = Oseq[2,3,]/1.4
+w34 = Oseq[3,4,]/1.4
+w45 = Oseq[4,5,]/1.4
+
+## loading libraries for plot
+library(ggplot2)
+library(ggpubr)
+## true partial correlation for each sample of covariate x
+truerho = x/1.4
+```
+
+
+
+## 4. Generating Figure 5 and Display MSE
+```{r, fig.align = "center", fig.width = 9.5, fig.height = 2.5}
+a = rep(0, length(x))
+for(i in 1:length(x)) a[i] = A$Osum[1,2,i]/sqrt(A$Osum[1,1,i]*A$Osum[2,2,i])
+## MSE for edge 1-2
+MSE12 = mean((a-truerho)^2); MSE12 # 0.0077
+temp1 = data.frame(x1=xseq, y1=w12)
+post = lowess(x, a, f=0.4)
+temp2 = data.frame(x2=post$x, y2=post$y)
+p1 = ggplot() + 
+  geom_line(temp1, mapping=aes(x=x1,y=y1, 
+                               color = "true partial correlation"), size = 0.6) + 
+  geom_line(temp2, mapping=aes(x=x2,y=y2, 
+                               color = "PxG posterior estimate"), size = 0.6) +
+  scale_colour_manual(values = c("true partial correlation" = "black", 
+                                 "PxG posterior estimate" = "red")) +
+  xlab("x") + ylab(expression(rho[12])) + labs(color = "") +
+  theme(axis.text=element_text(size=12), 
+        axis.title.x=element_text(size=16), 
+        axis.title.y=element_text(size=16,face="bold"),
+        legend.text = element_text(size=14)) +
+  annotate("text", x = -0.35, y = 0.45, label = "MSE 0.0077")
+
+a = rep(0, length(x))
+for(i in 1:length(x)) a[i] = A$Osum[2,3,i]/sqrt(A$Osum[2,2,i]*A$Osum[3,3,i])
+## MSE for edge 2-3
+MSE23 = mean((a-truerho)^2); MSE23 # 0.0078
+temp1 = data.frame(x1=xseq, y1=w23)
+post = lowess(x, a, f=0.4)
+temp2 = data.frame(x2=post$x, y2=post$y)
+p2 = ggplot() + 
+  geom_line(temp1, mapping=aes(x=x1,y=y1, 
+                               color = "true partial correlation"), size = 0.6) + 
+  geom_line(temp2, mapping=aes(x=x2,y=y2, 
+                               color = "PxG posterior estimate"), size = 0.6) +
+  scale_colour_manual(values = c("true partial correlation" = "black", 
+                                 "PxG posterior estimate" = "red")) +
+  xlab("x") + ylab(expression(rho[23])) + labs(color = "") +
+  theme(axis.text=element_text(size=12), 
+        axis.title.x=element_text(size=16), 
+        axis.title.y=element_text(size=16,face="bold"),
+        legend.text = element_text(size=14)) +
+  annotate("text", x = -0.35, y = 0.45, label = "MSE 0.0078")
+
+a = rep(0, length(x))
+for(i in 1:length(x)) a[i] = A$Osum[3,4,i]/sqrt(A$Osum[4,4,i]*A$Osum[3,3,i])
+## MSE for edge 3-4
+MSE34 = mean((a-truerho)^2); MSE34 # 0.0078
+temp1 = data.frame(x1=xseq, y1=w34)
+post = lowess(x, a, f=0.4)
+temp2 = data.frame(x2=post$x, y2=post$y)
+p3 = ggplot() + 
+  geom_line(temp1, mapping=aes(x=x1,y=y1, 
+                               color = "true partial correlation"), size = 0.6) + 
+  geom_line(temp2, mapping=aes(x=x2,y=y2, 
+                               color = "PxG posterior estimate"), size = 0.6) +
+  scale_colour_manual(values = c("true partial correlation" = "black", 
+                                 "PxG posterior estimate" = "red")) +
+  xlab("x") + ylab(expression(rho[34])) + labs(color = "") +
+  theme(axis.text=element_text(size=12), 
+        axis.title.x=element_text(size=16), 
+        axis.title.y=element_text(size=16,face="bold"),
+        legend.text = element_text(size=14)) +
+  annotate("text", x = -0.35, y = 0.45, label = "MSE 0.0078")
+
+a = rep(0, length(x))
+for(i in 1:length(x)) a[i] = A$Osum[4,5,i]/sqrt(A$Osum[4,4,i]*A$Osum[5,5,i])
+## MSE for edge 4-5
+MSE45 = mean((a-truerho)^2); MSE45 # 0.0125
+temp1 = data.frame(x1=xseq, y1=w45)
+post = lowess(x, a, f=0.4)
+temp2 = data.frame(x2=post$x, y2=post$y)
+p4 = ggplot() + 
+  geom_line(temp1, mapping=aes(x=x1,y=y1, 
+                               color = "true partial correlation"), size = 0.6) + 
+  geom_line(temp2, mapping=aes(x=x2,y=y2, 
+                               color = "PxG posterior estimate"), size = 0.6) +
+  scale_colour_manual(values = c("true partial correlation" = "black", 
+                                 "PxG posterior estimate" = "red")) +
+  xlab("x") + ylab(expression(rho[45])) + labs(color = "") +
+  theme(axis.text=element_text(size=12), 
+        axis.title.x=element_text(size=16), 
+        axis.title.y=element_text(size=16,face="bold"),
+        legend.text = element_text(size=14)) +
+  annotate("text", x = -0.35, y = 0.45, label = "MSE 0.0125")
+
+p0 = ggarrange(p1, p2, p3, p4, ncol = 4, nrow = 1, common.legend = TRUE); p0
+```
+
+

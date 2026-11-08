@@ -1,0 +1,9 @@
+"set","cluster","n","edges_selected","edges_drawn","proteins_drawn","proteins_total"
+"brca_network_authors","Cluster 1",82,4,4,6,15
+"brca_network_authors","Cluster 2",219,8,8,8,15
+"brca_network_authors","Cluster 3",226,18,18,13,15
+"brca_network_authors","Cluster 4",356,11,11,12,15
+"brca_network_package","Cluster 1",94,3,3,5,15
+"brca_network_package","Cluster 2",194,7,7,8,15
+"brca_network_package","Cluster 3",211,18,18,12,15
+"brca_network_package","Cluster 4",384,11,11,13,15

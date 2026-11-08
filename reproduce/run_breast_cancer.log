@@ -1,0 +1,29 @@
+chain: burnin 200, nmcmc 1000; membership cube 6.2 GB
+PxG_PL: 21 s, DIC 37509.36, cluster sizes 94 194 211 384
+          used (Mb) gc trigger (Mb) max used (Mb)
+Ncells  399943 21.4     701680 37.5   701680 37.5
+Vcells 1059983  8.1    8388608 64.0  1928745 14.8
+GraphOnly_PL: 19 s, DIC 43425.57, cluster sizes 291 97 368 127
+          used (Mb) gc trigger (Mb) max used (Mb)
+Ncells  399977 21.4     701680 37.5   701680 37.5
+Vcells 1060944  8.1    8388608 64.0  1928745 14.8
+weighted SS, package chain: PxG 363282.0, graph-only 665711.7
+weighted SS, authors' labels: PxG 359896.5, graph-only 618249.6 (script: 509029.4, 645584.9)
+PxG label agreement with authors (best matching): 0.870
+       authors
+package   1   2   3   4
+      1  74  10  10   0
+      2   4 177  10   3
+      3   2  21 176  12
+      4   2  11  30 341
+Graph_NS x 8: 23 s; edges per cluster (package labels): 3 7 18 11; (authors' labels): 4 8 18 11
+max |refit - authors' saved Graph_NS| per cluster: 0 0 0 0 
+saved inst/extdata/brca_pxg_results.rds 
+null device 
+          1 
+null device 
+          1 
+null device 
+          1 
+figures written to man/figures ; now run reproduce/make_network_figures.R
+exit 0

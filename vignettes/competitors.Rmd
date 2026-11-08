@@ -1,0 +1,137 @@
+---
+title: "4. The comparison methods: BM13, JRNS, k-lasso and mSSL"
+author: "covassistedGM"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{4. The comparison methods: BM13, JRNS, k-lasso and mSSL}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 4.5, dpi = 96)
+library(covassistedGM)
+```
+
+The paper compares PxG with four methods. Three of them are compiled into or written in this
+package from the code the authors distributed; the fourth is wrapped.
+
+| Method | Reference | Where it lives | Used in |
+|---|---|---|---|
+| k-lasso | Liu et al. (2010), kernel-smoothed graphical lasso | `klasso()`, `kernel_mc()`, `ekernel()` (authors' R code from `Example1.R`) | Example 1 |
+| BM13 | Bhadra and Mallick (2013); Niu, Pati and Mallick (2020) | `LSGraph()`, `MCMCGraph()`, `HIWsim()`, `meanOmegaHIW()` (C++ from `LSGraph_0.1.tar.gz`) | Examples 2, 3 |
+| mSSL | Deshpande, Rockova and George (2019) | `fit_mSSL()` wrapping the GitHub package `mSSL` | Examples 2, 3 |
+| JRNS | Samanta, Khare and Michailidis (2022) | `JRNS()`, `StepB()`, `StepOmega()` (C++ from `JRNS.zip`), `jrns_initial_values()` | Example 3 |
+
+All four assume, in one way or another, a single graph or a graph that is a fixed function
+of the covariates; none lets the graph structure change with the covariates through a
+partition, which is the point the paper makes with them.
+
+## BM13 (LSGraph)
+
+`LSGraph` fits a multivariate regression of $Y$ on $X$ with spike-and-slab selection of the
+columns of $X$ (indicators `gamma`) and a decomposable graph on the residual precision matrix
+under a hyper-inverse Wishart prior; the graph is updated by single-edge Metropolis moves,
+and non-decomposable proposals are rejected. `Adj.mean` is the posterior edge inclusion
+frequency used in the paper's Figures 6A and 9A.
+
+Example 2 with the authors' settings (`burnin = 1000`, `nmc = 2000`) takes under a minute;
+a shorter chain is run here.
+
+```{r bm13-ex2, fig.height = 4, fig.width = 4.5}
+sim2 <- simulate_example2(2020)
+set.seed(2022)
+bm <- LSGraph(Y = sim2$Y, X0 = sim2$X, bG = 3, DG = diag(5), k = 0, which = 1, m = 1, M = 1,
+              Kmat = diag(2), c = 300, alpha = 0.5, beta = 0.5, gamma0 = 0, Adj0 = diag(5),
+              burnin = 200, nmc = 400, verbose = FALSE)
+c(accept = bm$accept, reject = bm$reject, nondecomposable = bm$nondecomp)
+round(bm$Adj.mean, 2)
+G0 <- sim2$G0; diag(G0) <- 0
+plot_edge_heatmap(bm$Adj.mean, cutoff = 0.5, main = "BM13 on Example 2 (true graph: chain 1-2-3-4-5)")
+```
+
+Because the true partial correlations change sign with $x$, a single graph averages them
+towards zero and BM13 misses most chain edges; that is Figure 6A of the paper.
+
+## JRNS
+
+JRNS samples the regression coefficient matrix $B$ ($p \times q$) and the error precision
+matrix $\Omega$ ($q \times q$) of $Y = XB + E$ with spike-and-slab priors, using a
+generalised (pseudo-) likelihood. The authors initialise it from a lasso fit per response
+and a graphical lasso on the residuals; `jrns_initial_values()` does that and needs the
+suggested packages **glmnet** and **glasso**. Example 3 in the paper uses `nmc = 1000` and
+`burnin = 2000`; the chunk below uses the first 10 nodes of Example 3 and a short chain so
+that the vignette builds quickly.
+
+```{r jrns, eval = requireNamespace("glmnet", quietly = TRUE) && requireNamespace("glasso", quietly = TRUE)}
+sim3 <- simulate_example3(2022)
+Y <- sim3$Y[, 1:10]; X <- sim3$X
+init <- jrns_initial_values(X, Y)
+set.seed(2022)
+fit <- JRNS(B_ini = init$B, Omega_ini = init$Omega, Y = Y, X = X, nmc = 200, burnin = 200)
+freq <- jrns_edge_frequencies(fit)
+round(freq, 2)
+```
+
+The authors threshold these inclusion frequencies at 0.5 for Figure 9C. Because the two
+clusters of Example 3 have different graphs, a single $\Omega$ for all samples recovers the
+union of the two graphs at best.
+
+## k-lasso
+
+`klasso()` estimates one precision matrix per sample by kernel-weighting the samples in
+covariate space and fitting a graphical lasso (via **huge**) to the weighted covariance, with
+the bandwidth and penalty chosen by AIC on a grid. It is the authors' loop and takes about
+100 minutes for the full Example 1; here it is run on 15 samples and a coarse grid to show
+the interface.
+
+```{r klasso, eval = requireNamespace("huge", quietly = TRUE)}
+sim1 <- simulate_example1(2020)
+idx <- seq(1, 300, by = 20)
+K <- klasso(sim1$Y[idx, ], sim1$X[idx, , drop = FALSE], h_grid = c(0.3, 0.6, 1), l_grid = c(0.2, 0.5, 0.8),
+            verbose = FALSE)
+dim(K)
+round(K[, , 1], 2)
+```
+
+The saved full-length k-lasso result (`klasso.RData`) is used in `vignette("pxg-simulations")`
+for Figure 4.
+
+## mSSL
+
+The multivariate spike-and-slab lasso of Deshpande, Rockova and George (2019) is in the
+GitHub package `mSSL`, which is not on CRAN, so it is not vendored. If it is installed,
+`fit_mSSL()` calls `mSSL::mSSL_dpe(X, Y)` as the scripts do and returns the absolute partial
+correlations and implied graph displayed in Figures 6B and 9B.
+
+```{r mssl, eval = FALSE}
+# remotes::install_github("skdeshpande91/multivariate_SSL", subdir = "mSSL")
+set.seed(2022)
+ms <- fit_mSSL(sim2$X, sim2$Y)
+round(ms$abs_partial_cor, 2)
+```
+
+```{r mssl-check}
+requireNamespace("mSSL", quietly = TRUE)
+```
+
+## References
+
+Bhadra, A. and Mallick, B. K. (2013). Joint high-dimensional Bayesian variable and covariance
+selection with an application to eQTL analysis. *Biometrics*, 69(2), 447-457.
+
+Deshpande, S. K., Rockova, V. and George, E. I. (2019). Simultaneous variable and covariance
+selection with the multivariate spike-and-slab lasso. *Journal of Computational and Graphical
+Statistics*, 28(4), 921-931.
+
+Liu, H., Chen, X., Wasserman, L. and Lafferty, J. (2010). Graph-valued regression. *Advances
+in Neural Information Processing Systems*, 23.
+
+Niu, Y., Pati, D. and Mallick, B. K. (2020). Bayesian graph selection consistency under model
+misspecification. *Bernoulli*, 27(1), 637-672.
+
+Samanta, S., Khare, K. and Michailidis, G. (2022). A generalized likelihood-based Bayesian
+approach for scalable joint regression and covariance selection in high dimensions.
+*Statistics and Computing*, 32, 47.

@@ -1,0 +1,264 @@
+---
+title: "2. Breast cancer proteomics: reproducing Section 5 and drawing the cluster networks"
+author: "covassistedGM"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{2. Breast cancer proteomics: reproducing Section 5 and drawing the cluster networks}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 5, dpi = 96)
+library(covassistedGM)
+```
+
+## The data
+
+Section 5 of Niu et al. (2024) analyses 883 TCGA breast tumours. The graphical data $Y$ are
+reverse-phase protein array measurements of 15 proteins, twelve on the PI3K/AKT/mTOR axis
+and the three hormone and growth factor receptors; the covariates $X$ are the mRNA expression
+of the three receptor genes, whose status defines the clinical subtypes of breast cancer. The
+question is whether the protein network differs between tumour groups induced by receptor
+expression, without fixing those groups in advance. Both matrices are standardised.
+
+```{r data}
+data(brca_rna); data(brca_rppa)
+dim(brca_rna); dim(brca_rppa)
+colnames(brca_rppa)
+round(cor(brca_rna), 2)
+```
+
+## Fitting the PxG model
+
+The call below is the authors' `RealDataAnalysis.R` verbatim, apart from the data object
+names and `verbose = FALSE`. The authors' samplers keep an $n \times n \times n_{mcmc}$
+co-clustering array in memory for Dahl's partition estimate; with the paper's chain (1,000
+burn-in and 10,000 kept iterations) on 883 tumours that is 62 GB, so the package ships two
+things instead of running it here: the authors' own saved results from that chain
+(`inst/original_supplement/RData`), and the results of `reproduce/run_breast_cancer.R`, which
+runs the unchanged samplers on all 883 tumours with a shorter chain (200 burn-in, 1,000 kept,
+6 GB). The code is the authors'; only `burnin` and `nmcmc` differ. On a machine with enough
+memory, `PXG_FULL=TRUE Rscript reproduce/run_breast_cancer.R` runs the paper's chain.
+
+```{r fit, eval = FALSE}
+p <- 3; q <- 15; n <- 883
+set.seed(2022)
+A <- PxG_PL(YData = brca_rppa, XData = brca_rna,
+            spike = 0.01, slab = 1, a1 = 1, a2 = 1, alphaG = 0.5,
+            mu0 = rep(0, p), sigsq0 = 1, b1 = 30, b2 = 0.1,
+            M = 10, N = 4, burnin = 1000, nmcmc = 10000, z0 = sample(1:4, n, TRUE), B = 1,
+            verbose = FALSE)
+set.seed(2022)
+C <- GraphOnly_PL(YData = brca_rppa, XData = brca_rna,
+                  spike = 0.01, slab = 1, a1 = 1, a2 = 1, alphaG = 0.5,
+                  mu0 = rep(0, p), sigsq0 = 1, b1 = 30, b2 = 0.1,
+                  M = 10, N = 4, burnin = 1000, nmcmc = 10000, z0 = sample(1:4, n, TRUE), B = 1,
+                  verbose = FALSE)
+```
+
+```{r load-results}
+res <- readRDS(system.file("extdata", "brca_pxg_results.rds", package = "covassistedGM"))
+str(res$settings)
+```
+
+The priors deserve a comment. `spike = 0.01` and `slab = 1` put the neighbourhood-regression
+coefficients either close to zero or on the scale of the standardised data; `alphaG = 0.5`
+is an uninformative edge prior; `b1 = 30, b2 = 0.1` is a tight inverse-gamma prior on the
+covariate variance, which with `M = 10` and `N = 4` lets the three receptor genes drive a
+partition into at most four groups.
+
+## Posterior clustering (paper Figure 10)
+
+The authors' chain gives the partition and DIC values reported in the paper (37,531 for PxG
+and 40,798 for the graph-only model):
+
+```{r labels-authors}
+table(PxG_authors = res$authors$pxg_Label)
+table(graph_only_authors = res$authors$graph_only_Label)
+c(DIC_PxG = res$authors$pxg_DIC, DIC_graph_only = res$authors$graph_only_DIC)
+```
+
+The package's shorter chain, same code and seed, gives:
+
+```{r labels}
+table(PxG_package = res$pxg$Label)
+table(graph_only_package = res$graph_only$Label)
+c(DIC_PxG = res$pxg$DIC, DIC_graph_only = res$graph_only$DIC)
+```
+
+DIC values from chains of different lengths are not comparable (the variance term depends on
+the number of draws), but the partitions can be compared directly. The cross-table of the two
+PxG partitions, and the share of tumours placed in the same group under the best matching of
+labels:
+
+```{r compare-authors}
+table(package = res$pxg$Label, authors = res$authors$pxg_Label)
+res$agreement
+```
+
+Plotting the clusters against pairs of receptor genes reproduces Figure 10: the four groups
+line up with HER2-high, ER/PR-high, and ER/PR-low tumours. First the authors' partition, then
+the package run.
+
+```{r fig10, fig.height = 3.2, fig.width = 9}
+cols <- c("#1170AA", "#EF6F6A", "#009E73", "#000000"); pchs <- c(16, 17, 15, 18)
+lab <- res$authors$pxg_Label
+par(mfrow = c(1, 3), mar = c(4.5, 4.5, 2, 1))
+plot(brca_rna[, "ERBB2"], brca_rna[, "ESR1"], col = cols[lab], pch = pchs[lab], cex = 0.7, xlab = "ERBB2 (HER2)", ylab = "ESR1 (ER)", main = "authors' chain")
+plot(brca_rna[, "ERBB2"], brca_rna[, "PGR"],  col = cols[lab], pch = pchs[lab], cex = 0.7, xlab = "ERBB2 (HER2)", ylab = "PGR (PR)")
+plot(brca_rna[, "ESR1"],  brca_rna[, "PGR"],  col = cols[lab], pch = pchs[lab], cex = 0.7, xlab = "ESR1 (ER)", ylab = "PGR (PR)")
+legend("bottomright", paste("Cluster", 1:4), col = cols, pch = pchs, bty = "n", cex = 0.8)
+```
+
+```{r fig10-package, fig.height = 3.2, fig.width = 9}
+lab <- res$pxg$Label
+par(mfrow = c(1, 3), mar = c(4.5, 4.5, 2, 1))
+par(mfrow = c(1, 3), mar = c(4.5, 4.5, 2, 1))
+plot(brca_rna[, "ERBB2"], brca_rna[, "ESR1"], col = cols[lab], pch = pchs[lab], cex = 0.7, xlab = "ERBB2 (HER2)", ylab = "ESR1 (ER)", main = "package run")
+plot(brca_rna[, "ERBB2"], brca_rna[, "PGR"],  col = cols[lab], pch = pchs[lab], cex = 0.7, xlab = "ERBB2 (HER2)", ylab = "PGR (PR)")
+plot(brca_rna[, "ESR1"],  brca_rna[, "PGR"],  col = cols[lab], pch = pchs[lab], cex = 0.7, xlab = "ESR1 (ER)", ylab = "PGR (PR)")
+```
+
+The graph-only partition ignores the receptors and is correspondingly less homogeneous in
+covariate space (paper Figure 11). The paper measures this with a within-cluster sum of
+squares of the covariates and reports 509,029 for PxG against 645,585 for graph-only. The
+script's expression that produces those numbers accumulates each cluster's sum of squares
+once per member and recycles the mean vector against the data matrix (see
+`?within_cluster_ss`), so `within_cluster_ss()` returns the plain within-cluster sum of
+squares, the size-weighted sum, and the script's own value, which matches the two reported
+numbers for the authors' partitions:
+
+```{r ss}
+pick <- c("ss", "weighted_ss", "script_value")
+round(rbind(PxG_authors = unlist(res$ss$pxg_authors[pick]),
+            graph_only_authors = unlist(res$ss$graph_only_authors[pick]),
+            PxG_package = unlist(res$ss$pxg[pick]),
+            graph_only_package = unlist(res$ss$graph_only[pick])), 1)
+```
+
+All three versions rank the partitions the same way.
+
+```{r fig11, fig.height = 3.2, fig.width = 9}
+lab <- res$authors$graph_only_Label
+par(mfrow = c(1, 3), mar = c(4.5, 4.5, 2, 1))
+plot(brca_rna[, "ERBB2"], brca_rna[, "ESR1"], col = cols[lab], pch = pchs[lab], cex = 0.7, xlab = "ERBB2 (HER2)", ylab = "ESR1 (ER)", main = "graph-only model")
+plot(brca_rna[, "ERBB2"], brca_rna[, "PGR"],  col = cols[lab], pch = pchs[lab], cex = 0.7, xlab = "ERBB2 (HER2)", ylab = "PGR (PR)")
+plot(brca_rna[, "ESR1"],  brca_rna[, "PGR"],  col = cols[lab], pch = pchs[lab], cex = 0.7, xlab = "ESR1 (ER)", ylab = "PGR (PR)")
+```
+
+## One network per cluster (paper Figure 12)
+
+The authors estimate each cluster's graph by rerunning the single-graph neighbourhood
+selection sampler `Graph_NS` on that cluster's tumours (`spike = 0.1`, `slab = 5`,
+`alphaG = 0.5`, 100 burn-in and 1,000 kept iterations, `set.seed(2022)` before each call),
+symmetrising the directed selection frequencies with the maximum rule and declaring an edge
+at posterior probability 0.5. `cluster_graphs()` does exactly this. Applied to the authors'
+partition it reproduces their saved `probG1`-`probG4` matrices to machine precision (the
+refit uses the same code and seed), which is checked in `reproduce/run_breast_cancer.R`:
+
+```{r refit-check}
+res$refit_matches_authors
+```
+
+The call takes about half a minute for the four clusters, so the saved result is used here.
+
+```{r cluster-graphs, eval = FALSE}
+graphs <- cluster_graphs(brca_rppa, res$authors$pxg_Label, spike = 0.1, slab = 5, a1 = 1, a2 = 1,
+                         alphaG = 0.5, burnin = 100, nmcmc = 1000, cutoff = 0.5, seed = 2022)
+```
+
+```{r graphs-loaded}
+graphs <- res$cluster_graphs_authors_labels
+sapply(graphs, function(g) c(n = g$n, edges = sum(g$adj) / 2))
+```
+
+The heat maps are the package's base-graphics version of Figure 12 (grey scale is the
+posterior edge probability, dots mark edges above 0.5):
+
+```{r fig12, fig.height = 8, fig.width = 8}
+par(mfrow = c(2, 2))
+for (k in seq_along(graphs)) plot_edge_heatmap(graphs[[k]]$prob, cutoff = 0.5, main = names(graphs)[k])
+```
+
+And the same graphs drawn as networks with `Network_VisualizationSB()`: a circular layout,
+arcs whose width is the posterior edge probability, and node size equal to the summed
+probability of the edges at that protein (its "connectivity degree"). Proteins without a
+selected edge are not drawn, which is itself informative.
+
+```{r networks, fig.height = 6.5, fig.width = 6}
+plots <- plot_pxg_networks(graphs, title = "PxG cluster networks, TCGA breast cancer", thres = 0.5)
+plots[["Cluster 1"]]
+plots[["Cluster 2"]]
+plots[["Cluster 3"]]
+plots[["Cluster 4"]]
+```
+
+`pxg_network_matrix()` builds the weight matrix that the plotting function expects (selected
+edges carry their posterior probability, everything else is 0), and the function's own output
+lets you check that what is drawn is what was selected:
+
+```{r network-check}
+M <- pxg_network_matrix(graphs[["Cluster 1"]]$prob, graphs[["Cluster 1"]]$adj)
+r <- Network_VisualizationSB(M, NULL, thres = 0.5, regionname = "Cluster 1")
+d <- igraph::as_data_frame(r$graph, "edges")
+head(d[order(-d$Correlation), ])
+c(edges_selected = sum(graphs[["Cluster 1"]]$adj) / 2, edges_drawn = nrow(d))
+```
+
+A base-graphics alternative without ggraph is `plot_cluster_network()`:
+
+```{r networks-base, fig.height = 4, fig.width = 4}
+plot_cluster_network(graphs[["Cluster 1"]]$prob, graphs[["Cluster 1"]]$adj, main = "Cluster 1 (igraph)")
+```
+
+Edges shared by all four clusters and edges private to one cluster are easy to list from the
+adjacency matrices:
+
+```{r shared-edges}
+adj <- lapply(graphs, `[[`, "adj")
+shared <- Reduce(`&`, lapply(adj, function(A) A == 1))
+edge_list <- function(M) { idx <- which(M & upper.tri(M), arr.ind = TRUE)
+  paste(rownames(M)[idx[, 1]], colnames(M)[idx[, 2]], sep = " - ") }
+edge_list(shared)
+for (k in seq_along(adj)) {
+  others <- Reduce(`|`, lapply(adj[-k], function(A) A == 1))
+  cat(names(adj)[k], "only:", paste(edge_list(adj[[k]] == 1 & !others), collapse = ", "), "\n")
+}
+```
+
+The same graphs for the package's reduced-chain partition are in
+`res$cluster_graphs`; the cluster that the two partitions agree on most closely has nearly the
+same network:
+
+```{r compare-graphs}
+g_pkg <- res$cluster_graphs
+sapply(g_pkg, function(g) c(n = g$n, edges = sum(g$adj) / 2))
+# correlation of posterior edge probabilities between each package cluster and each authors' cluster
+round(outer(seq_along(g_pkg), seq_along(graphs), Vectorize(function(i, k)
+  cor(g_pkg[[i]]$prob[upper.tri(g_pkg[[i]]$prob)], graphs[[k]]$prob[upper.tri(graphs[[k]]$prob)]))), 2)
+```
+
+## Using the MCMC output directly
+
+`PxG_PL` also returns `Gsum`, the per-sample counts of neighbourhood indicators over the
+kept iterations, so one can average edge probabilities over the samples of each cluster
+without a refit. This is what `cluster_edge_probabilities()` computes; it was saved too:
+
+```{r gsum}
+P <- res$gsum_edge_probabilities
+round(P[["Cluster 1"]][1:6, 1:6], 2)
+```
+
+These MCMC-averaged probabilities are more conservative than the `Graph_NS` refit because
+they integrate over the uncertainty in the partition during the chain, and because the
+partition sampler uses `spike = 0.01` and `slab = 1` where the refit uses `0.1` and `5`.
+
+## Running it yourself
+
+```{r, eval = FALSE}
+# full reproduction with figures (about 7 minutes), from the package source directory:
+source(system.file("scripts", "RealDataAnalysis_package.R", package = "covassistedGM"))
+```

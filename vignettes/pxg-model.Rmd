@@ -1,0 +1,188 @@
+---
+title: "1. The PxG model and how the package maps onto the paper"
+author: "covassistedGM"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{1. The PxG model and how the package maps onto the paper}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 4.5)
+```
+
+## What this package is
+
+`covassistedGM` packages the reproducibility supplement of
+
+> Niu, Y., Ni, Y., Pati, D. and Mallick, B. K. (2024). Covariate-Assisted Bayesian Graph
+> Learning for Heterogeneous Data. *Journal of the American Statistical Association*,
+> 119(547), 1985-1999. doi:10.1080/01621459.2023.2233744.
+
+The supplement won a JASA reproducibility award. It consists of R and C++ scripts, the TCGA
+breast cancer data of Section 5, intermediate results, and four R Markdown documents. The
+package turns the scripts into documented, installable functions without changing any
+numerical statement, so that a result obtained from the package with a given seed is the
+result the supplement's `source()`/`sourceCpp()` workflow produces with the same seed. The
+original files are shipped verbatim:
+
+```{r}
+list.files(system.file("original_supplement", package = "covassistedGM"), recursive = TRUE)
+```
+
+This vignette explains the model, the two implementations, and the correspondence between the
+paper's notation and the function arguments. The other vignettes reproduce the paper:
+
+* `vignette("pxg-breast-cancer")`: the real data analysis of Section 5 with cluster networks.
+* `vignette("pxg-simulations")`: the three simulation studies of Section 4.
+* `vignette("competitors")`: the comparison methods BM13, JRNS, k-lasso and mSSL.
+
+## The model
+
+The data are $n$ samples with a response vector $y_i \in \mathbb{R}^q$, whose conditional
+independence graph is of interest, and a covariate vector $x_i \in \mathbb{R}^p$ that is
+believed to shape that graph. Instead of modelling the graph as an explicit function of $x$,
+PxG ("partition times graph") lets the covariates and the responses jointly partition the
+samples, and gives each cluster its own graph:
+
+$$
+y_i \mid z_i = k \sim \mathcal{N}_q(0, \Omega_k^{-1}), \qquad
+x_i \mid z_i = k \sim \mathcal{N}_p(\mu_k, \sigma_k^2 I_p), \qquad
+z_i \mid \pi \sim \sum_{k=1}^{N} \pi_k \delta_k ,
+$$
+
+with a truncated stick-breaking (Dirichlet process) prior on the weights $\pi$,
+$V_k \sim \text{Beta}(1, M)$, $\pi_k = V_k \prod_{l<k} (1 - V_l)$, $V_N = 1$. The covariate
+model (paper Section 3.1) is an *auxiliary* model: its purpose is to make the partition
+depend on $x$, so that samples with similar covariates are encouraged to share a graph. Its
+priors are $\mu_k \sim \mathcal{N}(\mu_0, \sigma_0^2 \sigma_k^2 I)$ and
+$\sigma_k^2 \sim \text{IG}(b_1, b_2)$.
+
+The graph inside each cluster is modelled in one of two ways.
+
+### Gaussian / G-Wishart specification (Section 3.2.1, `*_GW` functions)
+
+$\Omega_k \mid G_k \sim \mathcal{W}_{G_k}(b, D)$, a G-Wishart distribution restricted to the
+graph $G_k$, with independent Bernoulli($\alpha_G$) edges. Edges are updated by single-flip
+Metropolis moves whose acceptance ratio needs the ratio of two G-Wishart normalising
+constants; these are approximated by Monte Carlo with `BDgraph::gnorm`. That approximation is
+what limits this specification to small graphs. The paper uses it for $q = 3$ (Example 1) and
+$q = 5$ (Example 2).
+
+### Pseudo-likelihood specification (Section 3.2.2, `*_PL` functions)
+
+The joint Gaussian likelihood of a cluster is replaced by the product of the $q$ conditional
+regressions of each node on the others (neighbourhood selection), each with a spike-and-slab
+prior on the regression coefficients: $\beta_{jl} \mid \gamma_{jl} \sim
+\mathcal{N}(0, \sigma_j^2 v_{\gamma_{jl}})$ with $v_0 =$ `spike`, $v_1 =$ `slab`,
+$\gamma_{jl} \sim \text{Bernoulli}(\alpha_G)$ and $\sigma_j^2 \sim \text{IG}(a_1, a_2)$. All
+updates are conjugate, so the sampler is written in C++ and scales to $q = 50$ (Example 3) and
+to the breast cancer data ($q = 15$, $n = 883$).
+
+### Posterior summaries
+
+Both samplers return the partition with the smallest squared distance to the posterior
+co-clustering matrix (Dahl, 2006) as `Label`, and the deviance information criterion `DIC`,
+which the paper uses to compare PxG against two reduced models:
+
+* the **covariate-only** model (`CovOnly_*`), in which the partition is driven by $x$ only and
+  one graph is shared by all samples;
+* the **graph-only** model (`GraphOnly_*`), a Dirichlet process mixture of Gaussian graphical
+  models in which $x$ plays no role in the partition.
+
+## Argument map
+
+| Paper | `PxG_GW` | `PxG_PL` | Meaning |
+|---|---|---|---|
+| $Y$ ($n \times q$) | `Y` | `YData` | graphical data |
+| $X$ ($n \times p$) | `X` | `XData` | covariates |
+| $b, D$ | `b`, `D` | | G-Wishart degrees of freedom and scale |
+| $v_0, v_1$ | | `spike`, `slab` | spike-and-slab variances |
+| $a_1, a_2$ | | `a1`, `a2` | IG prior on node variances |
+| $\alpha_G$ | `alphaG` | `alphaG` | prior edge probability |
+| $\mu_0, \sigma_0^2$ | `mu0`, `sigsq0` | `mu0`, `sigsq0` | covariate-mean prior |
+| $b_1, b_2$ | `b1`, `b2` | `b1`, `b2` | IG prior on covariate variance |
+| $M$ | `M` | `M` | DP concentration |
+| $N$ | `N` | `N` | truncation level (maximum clusters) |
+| | `burnin`, `nmcmc` | `burnin`, `nmcmc` | MCMC length |
+| $z^{(0)}$ | `z0` | `z0` | initial allocation in `1:N` |
+| | `B` | `B` | graph sweeps per iteration |
+
+`verbose` is the only argument the package adds; with the default `TRUE` the functions print
+the same per-iteration lines as the original scripts.
+
+## A first run
+
+The 3-node simulation of Example 1 is small enough to run in a few seconds with a short chain.
+The true graph changes with the covariate on three intervals, so the posterior clustering
+should track those intervals.
+
+```{r example1-short}
+library(covassistedGM)
+sim <- simulate_example1(seed = 2020)
+set.seed(2020)
+fit <- PxG_GW(Y = sim$Y, X = sim$X, b = 3, D = diag(3), alphaG = 0.1,
+              mu0 = 0, sigsq0 = 1, b1 = 1, b2 = 1, M = 1, N = 5,
+              burnin = 20, nmcmc = 60, z0 = sample(1:5, 300, TRUE), B = 1, verbose = FALSE)
+table(fit$Label)
+plot(sim$x, fit$Label, pch = 19, col = fit$Label, xlab = "covariate x", ylab = "posterior cluster label",
+     main = "PxG_GW, short chain: clusters follow the covariate")
+abline(v = c(-1/3, 1/3), lty = 2)
+```
+
+The paper's chain (`burnin = 500`, `nmcmc = 1000`) takes a few minutes; the simulation
+vignette loads the authors' saved result and reproduces Figures 3 and 4 from it.
+
+## Notes on the original code
+
+Reading the supplement line by line for this package turned up a few points that a user should
+know. None of them was changed, because the package's purpose is to reproduce the paper; each
+is documented where it matters.
+
+1. **Compilation.** The original `PxG-PL.cpp` carries `// [[Rcpp::plugins(cpp11)]]`.
+   RcppArmadillo now requires C++14, so `sourceCpp("PxG-PL.cpp")` fails on a current R
+   installation with "C++14 compiler required". The package compiles the same code under
+   C++14 (`src/Makevars`); nothing else was needed.
+2. **Covariate likelihood in `PxG_GW` and `CovOnly_GW`.** The helpers `getlogTotLike()` and
+   `getlogTotLikeX()` in `PxG-GW.R` accumulate into a misspelt variable (`lgoTotX`), so the
+   covariate part of the log likelihood they return is always zero. The DIC values of
+   `PxG_GW` and `CovOnly_GW` therefore contain only the graphical part, whereas
+   `GraphOnly_GW` adds a single-cluster covariate marginal likelihood (`logMultiX`). The DIC
+   values reported for Example 1 (2193.3, 2584.6, 3189.9) are those of this code; the
+   pseudo-likelihood implementation does not have this issue.
+3. **Inverse-gamma shape in the C++ covariate update.** `UpdateCovParam` in `PxG-GW.R` uses
+   the posterior shape $b_1 + n_k p / 2$ for $\sigma_k^2$ (all $p$ coordinates contribute),
+   while the C++ version uses $b_1 + n_k / 2$. The two implementations therefore place
+   slightly different posteriors on the covariate variance when $p > 1$; the C++ one is the
+   one used for Example 3 and the breast cancer analysis.
+4. **Graph-only DIC in C++.** The covariate term of `GraphOnly_PL`'s DIC is computed by
+   `getlogTotLikeCov`, which evaluates the Gaussian log likelihood with the prior-augmented
+   total sum of squares (`TSS`) rather than the residual sum of squares around the sampled
+   mean (`RSS`, computed but unused).
+5. **`Graph_NS` iteration count.** The single-graph sampler runs `burnin + nmcmc - 1`
+   iterations and divides by `nmcmc`, so posterior edge frequencies are bounded by
+   $(n_{mcmc} - 1)/n_{mcmc}$.
+6. **Within-cluster sum of squares (Section 5).** `RealDataAnalysis.R` reports a "total sum
+   of squares" of the covariates of 509,029 (PxG) and 645,585 (graph-only). Two things happen
+   in that expression: each cluster's sum of squares is accumulated once per member of the
+   cluster, which multiplies it by the cluster size, and the length-3 mean vector is
+   subtracted from an $n_k \times 3$ matrix, which R recycles down the columns so that most
+   entries have another column's mean removed. `within_cluster_ss()` returns the plain total
+   within-cluster sum of squares, the size-weighted version, and the script's own value
+   (which reproduces the two numbers above for the authors' partitions).
+7. **Partial correlations in Examples 1 and 2.** The scripts plot
+   $\Omega_{ij}/\sqrt{\Omega_{ii}\Omega_{jj}}$ (no minus sign) for both the estimate and the
+   truth, so the comparison is internally consistent; `partial_correlation_path()` follows
+   the scripts by default and has a `signed` switch.
+
+## References
+
+Dahl, D. B. (2006). Model-based clustering for expression data via a Dirichlet process
+mixture model. In *Bayesian Inference for Gene Expression and Proteomics*. Cambridge
+University Press.
+
+Niu, Y., Ni, Y., Pati, D. and Mallick, B. K. (2024). Covariate-Assisted Bayesian Graph Learning
+for Heterogeneous Data. *Journal of the American Statistical Association*, 119(547), 1985-1999.

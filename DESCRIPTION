@@ -1,0 +1,59 @@
+Package: covassistedGM
+Type: Package
+Title: Covariate-Assisted Bayesian Graph Learning for Heterogeneous Data (PxG)
+Version: 0.1.0
+Authors@R: c(
+    person("Yabo", "Niu", role = "aut", comment = "author of the method and of the original code"),
+    person("Yang", "Ni", role = "aut", comment = "author of the method and of the original code"),
+    person("Debdeep", "Pati", role = "aut", comment = "author of the method"),
+    person("Bani K.", "Mallick", role = "aut", comment = "author of the method and of BM13"),
+    person("Anindya", "Bhadra", role = "ctb", comment = "author of the BM13 method"),
+    person("Srijata", "Samanta", role = "ctb", comment = "author of the JRNS code"),
+    person("Kshitij", "Khare", role = "ctb", comment = "author of the JRNS method"),
+    person("George", "Michailidis", role = "ctb", comment = "author of the JRNS method"),
+    person("Sagnik", "Bhadury", email = "sagnik.bhadury@gmail.com", role = c("cre", "ctb"),
+           comment = "packaging, documentation, reproducibility scripts"))
+Description: R package built from the JASA reproducibility supplement of Niu, Ni, Pati and
+    Mallick (2024) <doi:10.1080/01621459.2023.2233744>, "Covariate-Assisted Bayesian Graph
+    Learning for Heterogeneous Data". The PxG model partitions samples with a truncated
+    Dirichlet process whose allocation is informed jointly by a response matrix and a
+    covariate matrix, and fits a sparse Gaussian graphical model within each cluster.
+    Two specifications are provided exactly as in the supplement: a Gaussian / G-Wishart
+    sampler in R for small graphs ('PxG_GW') and a pseudo-likelihood spike-and-slab
+    neighbourhood-selection sampler in C++ for larger graphs ('PxG_PL'), together with the
+    covariate-only and graph-only comparison models, the TCGA breast cancer data analysed in
+    the paper, the authors' saved intermediate results, the comparison methods of the paper
+    compiled from the same supplement (BM13 via 'LSGraph', JRNS, k-lasso) or wrapped (mSSL),
+    and scripts and vignettes that reproduce every figure and number in the paper from the
+    packaged functions.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Depends: R (>= 4.1.0)
+Imports:
+    Rcpp (>= 1.0.0),
+    BDgraph,
+    invgamma,
+    igraph,
+    ggplot2,
+    ggraph,
+    stats,
+    graphics,
+    grDevices,
+    utils
+LinkingTo: Rcpp, RcppArmadillo
+Suggests:
+    ggpubr,
+    huge,
+    glmnet,
+    glasso,
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
+SystemRequirements: C++14
+URL: https://github.com/sagnikbhadury/cov_assistedGM
+BugReports: https://github.com/sagnikbhadury/cov_assistedGM/issues
+Roxygen: list(markdown = FALSE)
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0
