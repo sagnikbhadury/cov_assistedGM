@@ -3,7 +3,7 @@
 // into one translation unit because RcppArmadilloExtensions/sample.h defines non-inline functions
 // and may be included only once per shared library. Exported signatures are namespace-qualified
 // (arma::mat, Rcpp::List) so that Rcpp's generated wrappers compile. Packaging changes only, see
-// src/README_sources.md.
+// inst/README_sources.md.
 #include <RcppArmadillo.h>
 // [[Rcpp::depends(RcppArmadillo)]]
 #include <RcppArmadilloExtensions/sample.h>

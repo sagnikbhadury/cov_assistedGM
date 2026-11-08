@@ -46,8 +46,8 @@ For all three functions, pseudo-likelihood model is used for likelihood and grap
 // Package version of the authors' PxG-PL.cpp (Niu, Ni, Pati & Mallick, JASA 2024).
 // Changes relative to the supplement are limited to packaging:
 //   * includes reordered so that RcppArmadillo.h comes first (R.h / Rmath.h are
-//     pulled in by Rcpp) and the C++11 plugin removed (current Armadillo needs C++14,
-//     set in src/Makevars);
+//     pulled in by Rcpp) and the C++11 plugin removed (current Armadillo needs at least
+//     C++14, which R's default standard provides);
 //   * std::cout replaced by Rcpp::Rcout, switched on by a trailing `verbose`
 //     argument (default TRUE, matching the original per-iteration printing);
 //   * every numerical statement is unchanged.

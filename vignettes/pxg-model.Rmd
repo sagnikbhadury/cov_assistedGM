@@ -144,8 +144,8 @@ is documented where it matters.
 
 1. **Compilation.** The original `PxG-PL.cpp` carries `// [[Rcpp::plugins(cpp11)]]`.
    RcppArmadillo now requires C++14, so `sourceCpp("PxG-PL.cpp")` fails on a current R
-   installation with "C++14 compiler required". The package compiles the same code under
-   C++14 (`src/Makevars`); nothing else was needed.
+   installation with "C++14 compiler required". The package compiles the same code with R's
+   default C++ standard (C++14 or later); nothing else was needed.
 2. **Covariate likelihood in `PxG_GW` and `CovOnly_GW`.** The helpers `getlogTotLike()` and
    `getlogTotLikeX()` in `PxG-GW.R` accumulate into a misspelt variable (`lgoTotX`), so the
    covariate part of the log likelihood they return is always zero. The DIC values of

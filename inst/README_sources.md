@@ -13,9 +13,9 @@ Mallick (2024), "Covariate-Assisted Bayesian Graph Learning for Heterogeneous Da
 
 Changes made for packaging, and nothing else:
 
-1. `// [[Rcpp::plugins("cpp11")]]` removed and C++14 selected in `Makevars`; current
-   RcppArmadillo refuses to compile in C++11 mode, which is why the original `sourceCpp()` calls
-   fail on an up-to-date R installation.
+1. `// [[Rcpp::plugins("cpp11")]]` removed, so the code compiles with R's default C++ standard
+   (C++14 on R 4.1-4.2, C++17 from R 4.3); current RcppArmadillo refuses to compile in C++11 mode,
+   which is why the original `sourceCpp()` calls fail on an up-to-date R installation.
 2. `#include <R.h>` and `#include <Rmath.h>` placed before `RcppArmadillo.h` were removed; Rcpp
    includes them itself and warns when they come first.
 3. `std::cout` replaced by `Rcpp::Rcout` and placed behind a trailing `verbose` argument (default

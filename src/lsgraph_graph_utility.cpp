@@ -1,5 +1,5 @@
 // BM13 competitor (Bhadra & Mallick 2013; Niu, Pati & Mallick 2020): file graph_utility.cpp of the authors' LSGraph 0.1
-// package, shipped in the JASA supplement of Niu et al. (2024). Packaging changes only, see src/README_sources.md.
+// package, shipped in the JASA supplement of Niu et al. (2024). Packaging changes only, see inst/README_sources.md.
 // [[Rcpp::depends(RcppArmadillo)]]
 #include <RcppArmadillo.h>
 // #include <armadillo> // not necessary, already in "graph_utility.h"

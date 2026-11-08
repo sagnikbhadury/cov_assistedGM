@@ -41,7 +41,7 @@ covariate-only and a graph-only reduced model for DIC comparison. See
 remotes::install_github("sagnikbhadury/cov_assistedGM", build_vignettes = TRUE)
 ```
 
-Needs a C++14 compiler (Rtools on Windows). Imports: Rcpp, RcppArmadillo, BDgraph, invgamma,
+Needs a C++ compiler (Rtools on Windows). Imports: Rcpp, RcppArmadillo, BDgraph, invgamma,
 igraph, ggplot2, ggraph. Suggested: huge (k-lasso), glmnet and glasso (JRNS initialisation),
 ggpubr, knitr, rmarkdown, testthat. The mSSL competitor is a GitHub package
 (`remotes::install_github("skdeshpande91/multivariate_SSL", subdir = "mSSL")`) and is wrapped,
@@ -63,8 +63,8 @@ not vendored.
 | Figures | `plot_edge_heatmap`, `Network_VisualizationSB`, `pxg_network_matrix`, `plot_pxg_networks`, `plot_cluster_network` | heat maps as in the paper; network drawing from Sagnik Bhadury's `Network Visualization.R` |
 
 Everything that was changed in the authors' sources for packaging is listed in
-`src/README_sources.md`: C++14 compilation (current RcppArmadillo refuses the original C++11
-plugin, so the supplement's `sourceCpp()` calls fail on an up-to-date R), `std::cout` routed
+`inst/README_sources.md`: the original C++11 plugin dropped (current RcppArmadillo refuses C++11,
+so the supplement's `sourceCpp()` calls fail on an up-to-date R), `std::cout` routed
 to `Rcpp::Rcout` behind a `verbose` argument, namespace-qualified calls, and the three JRNS
 files merged into one translation unit. Nothing in the samplers' arithmetic, priors, updates
 or random-number calls was touched.
@@ -142,21 +142,21 @@ with enough memory, `PXG_FULL=TRUE Rscript reproduce/run_breast_cancer.R` runs t
 
 ## Verification against the supplement
 
-Three checks that the packaged code is the supplement's code:
+Three checks, all run with the packaged functions and compared with the authors' saved
+`.RData` objects from the supplement (`reproduce/verify_against_supplement.R`,
+`reproduce/run_breast_cancer.R`; logs and the saved comparison are in `reproduce/`):
 
-1. **Per-cluster graphs, breast cancer.** `Graph_NS` run on the authors' saved partition with
-   the script's settings and seed reproduces their saved `probG1`-`probG4` matrices with a
-   maximum absolute difference of 0 (`reproduce/run_breast_cancer.log`).
-2. **Example 3, `PxG_PL`** with the paper's chain (500 + 1,000 iterations, n = 500, q = 50,
-   seed 2022) against `Example3A.RData`.
-3. **Example 1, `PxG_GW`** with the paper's chain (500 + 1,000 iterations, seed 2020) against
-   `Example1A.RData`.
+| Check (paper's chain, authors' seed) | Package | Authors' saved | Result |
+|---|---|---|---|
+| Example 3, `PxG_PL`, 500 + 1,000 iterations, n = 500, q = 50 | DIC 104164.6522 | DIC 104164.6522 | labels identical, DIC identical, `Gsum` identical (19 min) |
+| Example 1, `PxG_GW`, 500 + 1,000 iterations, n = 300, q = 3 | DIC 2193.3035 | DIC 2193.3035 | labels identical, DIC identical, `Gsum` identical, `Osum` within 7e-15 (1 min) |
+| Breast cancer, `Graph_NS` on the authors' partition, 100 + 1,000 | `probG1`-`probG4` | `probG1`-`probG4` | identical (maximum absolute difference 0) |
 
-Checks 2 and 3 are run by `reproduce/verify_against_supplement.R`; the log and the saved
-comparison (`reproduce/verify_against_supplement.log`, `reproduce/output/`) record whether the
-labels, DIC and edge summaries are identical. A G-Wishart chain can differ from the authors'
-only through the Monte Carlo normalising-constant approximation in `BDgraph::gnorm`, whose
-random-number stream depends on the installed BDgraph version.
+The PxG partitions agree sample by sample (250/250 in each of the two Example 3 clusters;
+34, 71, 1, 92 and 102 in the five Example 1 clusters). Run on R 4.5.2 (Windows, Rtools 4.5),
+BDgraph 2.74, RcppArmadillo 15.6.0.1, on 8 Nov 2026. The G-Wishart chain reproduces the
+authors' draws because `BDgraph::gnorm` uses R's random-number stream; a different BDgraph
+version could change that chain while leaving the pseudo-likelihood chains unaffected.
 
 ## Reproducing the paper
 
@@ -177,8 +177,9 @@ are in `inst/original_supplement/RMarkdown/`.
 Reading the supplement line by line for this package turned up the following; nothing was
 changed, each point is documented where it matters (details in `vignette("pxg-model")`):
 
-1. `PxG-PL.cpp` requests C++11; current RcppArmadillo needs C++14, so the supplement's
-   `sourceCpp()` fails on an up-to-date R. The package compiles the same code under C++14.
+1. `PxG-PL.cpp` requests C++11; current RcppArmadillo needs at least C++14, so the supplement's
+   `sourceCpp()` fails on an up-to-date R. The package compiles the same code with R's default
+   C++ standard.
 2. In `PxG-GW.R`, the helpers that add the covariate log likelihood to the DIC of `PxG_GW` and
    `CovOnly_GW` assign to a misspelt variable, so that term is always zero in those two
    models (not in `GraphOnly_GW`). The Example 1 DIC values in the paper are those of this code.

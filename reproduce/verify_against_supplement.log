@@ -1,0 +1,4 @@
+Example 3 PxG_PL: 1154 s; DIC 104164.6522 vs authors 104164.6522; labels identical TRUE; Gsum identical TRUE
+Example 1 PxG_GW: 34 s; DIC 2193.3035 vs authors 2193.3035; labels identical TRUE; max |Gsum diff| 0
+saved reproduce/output/verify_against_supplement.rds
+exit 0
