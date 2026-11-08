@@ -58,6 +58,6 @@ test_that("k-lasso helpers run on a few samples", {
 })
 
 test_that("fit_mSSL fails cleanly when the GitHub package is absent", {
-  skip_if(requireNamespace("mSSL", quietly = TRUE))
+  skip_if(has_mSSL())
   expect_error(fit_mSSL(matrix(rnorm(20), 10), matrix(rnorm(30), 10)), "mSSL")
 })

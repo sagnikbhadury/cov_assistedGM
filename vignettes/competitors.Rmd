@@ -103,7 +103,7 @@ for Figure 4.
 
 The multivariate spike-and-slab lasso of Deshpande, Rockova and George (2019) is in the
 GitHub package `mSSL`, which is not on CRAN, so it is not vendored. If it is installed,
-`fit_mSSL()` calls `mSSL::mSSL_dpe(X, Y)` as the scripts do and returns the absolute partial
+`fit_mSSL()` calls that package's `mSSL_dpe(X, Y)` as the scripts do and returns the absolute partial
 correlations and implied graph displayed in Figures 6B and 9B.
 
 ```{r mssl, eval = FALSE}
@@ -114,7 +114,7 @@ round(ms$abs_partial_cor, 2)
 ```
 
 ```{r mssl-check}
-requireNamespace("mSSL", quietly = TRUE)
+has_mSSL()
 ```
 
 ## References

@@ -31,7 +31,7 @@ plot_edge_heatmap(bm$Adj.mean, cutoff = 0.5, main = "(A) BM13")
 
 ## Figure 6B: mSSL, if the GitHub package is installed
 ## remotes::install_github("skdeshpande91/multivariate_SSL", subdir = "mSSL")
-if (requireNamespace("mSSL", quietly = TRUE)) {
+if (has_mSSL()) {
   set.seed(2022)
   ms <- fit_mSSL(X, Y)
   plot_edge_heatmap(ms$abs_partial_cor, cutoff = NULL, main = "(B) mSSL |partial correlation|")

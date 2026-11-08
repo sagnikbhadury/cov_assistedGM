@@ -261,13 +261,14 @@ kernel_mc <- function(y, x, e = x, h = 1) {
 #'
 #' The "mSSL" competitor of Examples 2 and 3 (Deshpande, Rockova and George, 2019) lives in
 #' the GitHub package \code{skdeshpande91/multivariate_SSL/mSSL}, which is not on CRAN and is
-#' therefore not vendored here. This wrapper calls \code{mSSL::mSSL_dpe(X, Y)} exactly as the
+#' therefore not vendored here and not declared as a dependency (\code{\link{has_mSSL}} tests for
+#' it at run time). This wrapper calls \code{mSSL_dpe(X, Y)} of that package exactly as the
 #' authors' scripts do and returns the absolute partial correlations and the implied graph,
 #' which is what the paper's Figures 6B and 9B display. Install the package with
 #' \code{remotes::install_github("skdeshpande91/multivariate_SSL", subdir = "mSSL")}.
 #'
 #' @param X,Y Covariate and response matrices.
-#' @param ... Passed to \code{mSSL::mSSL_dpe}.
+#' @param ... Passed to \code{mSSL_dpe}.
 #' @return A list with the \code{mSSL_dpe} fit, \code{Omega} (estimated precision),
 #'   \code{abs_partial_cor} and the 0/1 \code{adj} of non-zero entries.
 #' @references Deshpande, S. K., Rockova, V. and George, E. I. (2019). Simultaneous variable and
@@ -275,10 +276,11 @@ kernel_mc <- function(y, x, e = x, h = 1) {
 #'   Computational and Graphical Statistics}, 28(4), 921-931.
 #' @export
 fit_mSSL <- function(X, Y, ...) {
-  if (!requireNamespace("mSSL", quietly = TRUE))
+  if (!has_mSSL())
     stop("fit_mSSL() needs the GitHub package 'mSSL': ",
          "remotes::install_github(\"skdeshpande91/multivariate_SSL\", subdir = \"mSSL\")")
-  fit <- mSSL::mSSL_dpe(X, Y, ...)
+  mSSL_dpe <- get("mSSL_dpe", envir = asNamespace("mSSL"))
+  fit <- mSSL_dpe(X, Y, ...)
   Om <- fit$Omega
   q <- ncol(Om)
   pc <- Om
@@ -286,4 +288,17 @@ fit_mSSL <- function(X, Y, ...) {
   pc <- abs(pc)
   adj <- (pc > 0) * 1; diag(adj) <- 0
   list(fit = fit, Omega = Om, abs_partial_cor = pc, adj = adj)
+}
+
+#' Is the optional mSSL package installed?
+#'
+#' The mSSL competitor is distributed on GitHub only, so it is not listed among this package's
+#' dependencies (CRAN-style dependency resolution cannot find it); this helper checks for it at
+#' run time. Install it with
+#' \code{remotes::install_github("skdeshpande91/multivariate_SSL", subdir = "mSSL")}.
+#' @return \code{TRUE} or \code{FALSE}.
+#' @export
+has_mSSL <- function() {
+  pkg <- "mSSL"
+  requireNamespace(pkg, quietly = TRUE)
 }

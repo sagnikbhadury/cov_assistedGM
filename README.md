@@ -43,9 +43,10 @@ remotes::install_github("sagnikbhadury/cov_assistedGM", build_vignettes = TRUE)
 
 Needs a C++ compiler (Rtools on Windows). Imports: Rcpp, RcppArmadillo, BDgraph, invgamma,
 igraph, ggplot2, ggraph. Suggested: huge (k-lasso), glmnet and glasso (JRNS initialisation),
-ggpubr, knitr, rmarkdown, testthat. The mSSL competitor is a GitHub package
-(`remotes::install_github("skdeshpande91/multivariate_SSL", subdir = "mSSL")`) and is wrapped,
-not vendored.
+ggpubr, knitr, rmarkdown, testthat. The mSSL competitor is a GitHub-only package
+(`remotes::install_github("skdeshpande91/multivariate_SSL", subdir = "mSSL")`); it is wrapped,
+not vendored, and not declared as a dependency, so `fit_mSSL()` checks for it at run time
+(`has_mSSL()`).
 
 ## What is in the package
 

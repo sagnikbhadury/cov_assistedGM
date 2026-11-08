@@ -45,7 +45,7 @@ bm <- LSGraph(Y = Y, X0 = X, bG = 3.0, DG = diag(50), k = 0, which = 1, m = 1, M
 plot_edge_heatmap(bm$Adj.mean, cutoff = 0.5, main = "(A) BM13", cex_axis = 0.4)
 
 ## Figure 9B: mSSL (GitHub package, optional)
-if (requireNamespace("mSSL", quietly = TRUE)) {
+if (has_mSSL()) {
   set.seed(2022)
   ms <- fit_mSSL(X, Y)
   plot_edge_heatmap(ms$abs_partial_cor, cutoff = NULL, main = "(B) mSSL", cex_axis = 0.4)
